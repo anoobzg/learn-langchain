@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain_community.chat_models import MiniMaxChat
 from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
 
 
 def get_weather(city: str) -> str:
@@ -48,6 +50,9 @@ def create_model():
 
 
 def main() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    load_dotenv(project_root / ".env")
+
     model = create_model()
 
     agent = create_agent(
