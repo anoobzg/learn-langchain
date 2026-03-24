@@ -35,10 +35,11 @@ def create_model():
                 "Please set MINIMAX_API_KEY and MINIMAX_GROUP_ID before running this script."
             )
 
+        use_model = os.getenv("MINIMAX_MODEL", "abab6.5-chat")
         return MiniMaxChat(
             minimax_api_key=minimax_api_key,
             minimax_group_id=minimax_group_id,
-            model=os.getenv("MINIMAX_MODEL", "abab6.5-chat"),
+            model=use_model,
             base_url=os.getenv(
                 "MINIMAX_BASE_URL",
                 "https://api.minimax.chat/v1/text/chatcompletion_v2",
