@@ -245,9 +245,19 @@ class LLMPlanner:
 
 
 def plan_for_request(req: PlanRequest) -> PlanResponse:
-    """Select planner implementation based on environment."""
+    """
+    Plan with deterministic fallback:
+    - Always try the lightweight heuristic parser first.
+    - If it produces any actions, return them immediately.
+    - Otherwise, if SLICER_AGENT_MOCK=1, return the empty heuristic result.
+    - Otherwise, call the LLM planner.
+    """
+    heuristic_resp = MockPlanner().plan(req)
+    if heuristic_resp.actions:
+        return heuristic_resp
+
     if os.getenv("SLICER_AGENT_MOCK", "").strip() == "1":
-        return MockPlanner().plan(req)
+        return heuristic_resp
 
     return LLMPlanner().plan(req)
 

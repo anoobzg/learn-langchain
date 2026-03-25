@@ -25,6 +25,9 @@ You can also use Mock mode (no LLM call) for integration testing:
 Then start:
 - Entry is `server.py` (recommended: run inside `slicer-agent/`: `uvicorn server:app --reload`)
 
+Test web UI:
+- Visit `GET /` in your browser (use `SLICER_AGENT_MOCK=1` for predictable behavior)
+
 ## JSON Contract
 The schema models are in `schemas.py`, and the whitelist DSL is defined in `dsl.py`.
 

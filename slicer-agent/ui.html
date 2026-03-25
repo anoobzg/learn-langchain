@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>slicer-agent test web</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; }
+      textarea { width: 100%; height: 120px; }
+      button { padding: 10px 14px; margin-top: 10px; cursor: pointer; }
+      pre { background: #f6f8fa; padding: 12px; overflow: auto; }
+      .row { margin-bottom: 12px; }
+      .hint { color: #666; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h2>slicer-agent test web</h2>
+    <div class="row hint">
+      For predictable local testing, start the server with <code>SLICER_AGENT_MOCK=1</code>.
+      The UI sends <code>PlanRequest</code> to <code>POST /v1/plan</code>.
+    </div>
+
+    <div class="row">
+      <label for="userText"><b>Natural language</b></label>
+      <textarea id="userText" spellcheck="false">load file_path=C:\models\test.stl slice current</textarea>
+    </div>
+
+    <div class="row">
+      <button id="btnPlan">Generate actions</button>
+    </div>
+
+    <div class="row">
+      <label><b>Response</b></label>
+      <pre id="output">Click the button to call the agent.</pre>
+    </div>
+
+    <script>
+      const outputEl = document.getElementById('output');
+      const userTextEl = document.getElementById('userText');
+      const btn = document.getElementById('btnPlan');
+
+      async function run() {
+        const user_text = userTextEl.value;
+        outputEl.textContent = 'Calling /v1/plan...';
+        try {
+          const res = await fetch('/v1/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              request_id: 'web-ui',
+              user_text: user_text,
+              context: {},
+              client_version: 'web-ui'
+            })
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            outputEl.textContent = `HTTP ${res.status}: ${JSON.stringify(data, null, 2)}`;
+            return;
+          }
+
+          const actions = (data.actions || []).map(a => ({
+            action: a.action,
+            params: a.params
+          }));
+
+          outputEl.textContent = JSON.stringify(
+            {
+              plan_id: data.plan_id,
+              requires_confirmation: data.requires_confirmation,
+              risk_level: data.risk_level,
+              summary: data.summary,
+              actions: actions
+            },
+            null,
+            2
+          );
+        } catch (e) {
+          outputEl.textContent = 'Error: ' + String(e);
+        }
+      }
+
+      btn.addEventListener('click', run);
+    </script>
+  </body>
+</html>
+
