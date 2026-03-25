@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 from dsl import ACTION_REGISTRY, validate_action_params
 from json_utils import normalize_actions, safe_json_loads
 from schemas import OrcaAction, PlanRequest, PlanResponse
+
+logger = logging.getLogger("slicer-agent")
 
 
 def _create_llm():
@@ -96,6 +99,12 @@ class MockPlanner:
 
         lowered = user_text.lower()
 
+        logger.info(
+            "Heuristic parsing started request_id=%s user_text=%r",
+            req.request_id,
+            user_text[:200],
+        )
+
         # Load local file: support patterns like:
         # - "load file_path=/path/to/model.stl"
         # - "path=/path/to/model.3mf"
@@ -159,6 +168,12 @@ class MockPlanner:
             validate_action_params(a.action, a.params)
             validated_actions.append(a)
 
+        logger.info(
+            "Heuristic parsing result request_id=%s actions=%s warnings=%s",
+            req.request_id,
+            [a.action for a in validated_actions],
+            warnings,
+        )
         return PlanResponse(
             request_id=req.request_id,
             plan_id=str(uuid.uuid4()),
@@ -177,6 +192,7 @@ class LLMPlanner:
         self.llm = _create_llm()
 
     def plan(self, req: PlanRequest) -> PlanResponse:
+        logger.info("LLMPlanner invoked request_id=%s", req.request_id)
         # Ask the model to output JSON only, then validate with Pydantic + whitelist checks.
         system = _build_system_prompt()
         user = _build_user_prompt(req)
@@ -196,6 +212,11 @@ class LLMPlanner:
             plan_dict = normalize_actions(plan_dict)
             resp = PlanResponse.model_validate(plan_dict)
         except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "LLMPlanner JSON/Schema parsing failed request_id=%s error=%r",
+                req.request_id,
+                str(e),
+            )
             return PlanResponse(
                 request_id=req.request_id,
                 plan_id=str(uuid.uuid4()),
@@ -254,10 +275,23 @@ def plan_for_request(req: PlanRequest) -> PlanResponse:
     """
     heuristic_resp = MockPlanner().plan(req)
     if heuristic_resp.actions:
+        logger.info(
+            "Plan selected heuristic-only request_id=%s actions=%s",
+            req.request_id,
+            [a.action for a in heuristic_resp.actions],
+        )
         return heuristic_resp
 
     if os.getenv("SLICER_AGENT_MOCK", "").strip() == "1":
+        logger.info(
+            "Plan selected heuristic result (empty) due to mock mode request_id=%s",
+            req.request_id,
+        )
         return heuristic_resp
 
+    logger.info(
+        "Heuristic returned no actions; falling back to LLMPlanner request_id=%s",
+        req.request_id,
+    )
     return LLMPlanner().plan(req)
 
